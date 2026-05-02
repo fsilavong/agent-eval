@@ -14,11 +14,13 @@ Before starting, read the doc template for report structure:
 
 ## Folder Structure
 
-All evaluation artefacts live under `agent-test/` in the user's project root:
+All evaluation artefacts live under `agent-eval/` in the user's project root:
 
 ```
-agent-test/
+agent-eval/
     data/
+        generate.<ext>          # reproducible dataset generation script
+        queries.jsonl           
         end-to-end/
         component-level/
             <component-name>/
@@ -35,7 +37,7 @@ agent-test/
 
 ## Mode Detection
 
-**Before doing anything**, check whether `agent-test/` exists in the codebase.
+**Before doing anything**, check whether `agent-eval/` exists in the codebase.
 
 - **Does not exist** → follow [COLD-START](#cold-start)
 - **Exists** → confirm with the user: _"I can see a previous eval run exists. Do you want to continue from where you left off (NEXT RUN), or start fresh (COLD-START)?"_  
@@ -55,7 +57,7 @@ agent-test/
 
 2. If the system intent is ambiguous, confirm with the user before proceeding.
 
-3. Write your understanding into `agent-test/doc.md` using the structure in `references/doc_template.md` — fill in sections 1 (System Introduction) and 2 (Key Components) now. Leave later sections as placeholders.
+3. Write your understanding into `agent-eval/doc.md` using the structure in `references/doc_template.md` — fill in sections 1 (System Introduction) and 2 (Key Components) now. Leave later sections as placeholders.
 
 ---
 
@@ -65,33 +67,62 @@ agent-test/
    - The system's goal (e.g. faithfulness for RAG, F1 for classification)
    - Industry standard for the task type
 
-   Document metric choices with brief justification in `agent-test/doc.md` section 2 and 3.
+   Document metric choices with brief justification in `agent-eval/doc.md` section 2 and 3.
 
 ---
 
 ### Phase 3 — Build the Dataset
 
+All dataset generation logic lives in data/generate.<ext>. Every LLM call records its model, prompt template, and seed. The final output is a single data/queries.jsonl — one UserQuery record per line.
+
+`UserQuery` schema:
+{
+  id:               string,
+  query:            string,
+  is_real:          bool,                       # true = production, false = synthetic
+  categories:       List[string],               # multi-label, e.g. ["factual", "multi-hop"]
+  difficulty: {
+    label:          "easy" | "medium" | "hard",
+    axes: {
+      clarity:      1-3,                        # 1=explicit, 3=ambiguous
+      reasoning:    1-3,                        # 1=single-step, 3=multi-hop
+      domain:       1-3                         # 1=common knowledge, 3=expert
+    },
+    rationale:          string,
+    model:              string,
+    prompt_template:    string                  # versioned template name
+  },
+  augmented_queries: [{
+    query:                         string,
+    technique:                     string,
+    technique_selection_rationale: string,
+    model:                         string,
+    prompt_template:               string,      # versioned template name
+    generation_seed:               int
+  }],
+  metadata: Any                                 # opaque field for any additional info (e.g. production query ID, augmentation lineage, etc.)
+}
+
+Pipeline — run sequentially inside data/generate.<ext>:
+
 5. Ask the user: _"Do you have real production queries I can use as a seed set?"_
-
-**If NO — synthetic generation:**
-
-  a. Based on the system intent, define a set of **distinct query categories** (aim for 3–6; each should be meaningfully different from the others).
-
-  b. For each category, generate **10 seed queries** with at least 1–2 at each difficulty level (easy, medium, hard).
 
 **If YES — sample from production:**
 
-  a. Cluster the provided queries and identify distinct categories.
+  a. Pull and randomly sample using a fixed seed (versioned constant in code) to ensure reproducibility. Sample at least 100 queries if possible. The pull and sampling logic lives entirely in generate.<ext>.
 
-  b. From each cluster, select **10 representative seed queries**, balanced across easy / medium / hard.
+  b. Study all the sampled queries and come up with categorisation given the system intent. Classify each query into one or more categories (e.g. "factual", "multi-hop", "ambiguous", "domain-specific"), and difficulty level (easy, medium, hard) based on the axes defined in the   `UserQuery`schema. Document category definitions and difficulty label rationale in `agent-eval/doc.md` section 4.
 
-**Difficulty level definitions** — rate each query across three axes; a query is "easy" if low on all three, "hard" if high on two or more, "medium" otherwise:
+  c. From each category, select **an appropriate number of representative seed queries**, balanced across easy / medium / hard, to use as the basis for augmentation. 
 
-  - **Query clarity**: explicit and unambiguous intent (easy) → implicit, vague, or multi-intent (hard)
-  - **Reasoning depth**: single-step lookup (easy) → multi-hop reasoning or chained tool use (hard)
-  - **Domain specificity**: common knowledge (easy) → requires precise domain expertise (hard)
+**Synthetic Generation:**
 
-6. From the seed set, generate an augmented dataset by applying **3–4 techniques per seed** (choose those most relevant to the query type), targeting ~50 queries per category total. Techniques:
+
+  a. Based on the system intent, define a set of **distinct query categories** that users might ask. If production queries are available, conduct a gap analysis to identify missing categories and underrepresented categories. Document category definitions in `agent-eval/doc.md` section 4.
+
+  b. For each new / underrepresented category, generate **an appropriate number of representative seed queries** with production queries as style transfer if available, balanced across easy / medium / hard, to use as the basis for augmentation. 
+
+6. From the seed set, generate an augmented dataset by selecting and applying **3–4 techniques per seed** via LLM, targeting ~50 queries per category total. Techniques:
    - **Obscuration** — paraphrase or use implicit phrasing to express the same intent
    - **Entity swapping** — change names, dates, domains while preserving query structure
    - **Format/style variation** — verbose, terse, question vs. instruction, formal vs. casual
@@ -104,7 +135,7 @@ agent-test/
 
    **Component-level test data**: do not construct these from scratch. After the first end-to-end run (Phase 5, step 8), the intermediate output of each component is cached to disk. Use those cached outputs as the input test cases for each component's isolated eval — this reflects the real upstream distribution each component sees in production. Save to `data/component-level/<component>/`.
 
-   Document dataset structure, generation methodology, and difficulty label rationale in `doc.md` section 4.
+   Document dataset structure, generation methodology, and difficulty label rationale in `agent-eval/doc.md` section 4.
 
 ---
 
@@ -133,7 +164,7 @@ agent-test/
      - Per-category score breakdown (bar chart)
      - Difficulty vs. score heatmap (easy / medium / hard × categories)
      - Trial variance plot for end-to-end (mean ± CI per category)
-   - Update `doc.md` as follows:
+   - Update `agent-eval/doc.md` as follows:
      - **Section 5**: fill in component and end-to-end results tables with scores, CIs, and run reference
      - **Section 6a**: fill in the initial trigger rules, scope, and flag any categories that are already near-saturated or showing high trial variance
      - **Section 6b**: append the first row to the run history table (date, git hash, run file, "Initial cold start", score ± CI, p-value = —, strategy updates = None)
@@ -162,6 +193,7 @@ agent-test/
 - **Sequential execution** — components run in pipeline order; intermediate outputs are passed forward and cached to disk
 - **3 trials for end-to-end** — run each end-to-end query 3 times; report mean score per query. Component evals are single-run.
 - **Always report uncertainty** — every score must include a 95% CI. Use paired t-test (n ≥ 30) or bootstrap with 1,000 resamples (n < 30) for regression comparisons.
+- **Reproducible generation** — every LLM call in generate.<ext> records model, prompt template, and seed. Sampling uses a fixed seed. Re-running the script reproduces the full dataset.
 - **Full citation** — every result in `doc.md` must reference its run file, dataset, and git hash (if available)
 - **Single entry point** — `run.<ext>` runs everything; no scattered scripts
 
