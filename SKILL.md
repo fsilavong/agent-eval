@@ -119,7 +119,7 @@ Pipeline — run sequentially inside data/generate.<ext>:
 **Synthetic Generation:**
 
 
-  a. Based on the system intent, define a set of **distinct query categories** that users might ask. If production queries are available, conduct a gap analysis to identify missing categories and underrepresented categories. Document category definitions in `agent-eval/doc.md` section 4.
+  a. Based on the system intent, define a set of **distinct query categories** that users might ask via LLM. If production queries are available, conduct a gap analysis to identify missing categories and underrepresented categories. Document category definitions in `agent-eval/doc.md` section 4.
 
   b. For each new / underrepresented category, generate **an appropriate number of representative seed queries** with production queries as style transfer if available, balanced across easy / medium / hard, to use as the basis for augmentation. 
 
