@@ -24,6 +24,7 @@ agent-eval/
         end-to-end/
         component-level/
             <component-name>/
+                manifest.json   # records which end-to-end run produced these inputs
     metrics/
     runs/
         <YYYY-MM-DD>/
@@ -73,11 +74,11 @@ agent-eval/
 
 ### Phase 3 — Build the Dataset
 
-All dataset generation logic lives in data/generate.<ext>. Every LLM call records its model, prompt template, and seed. The final output is a single data/queries.jsonl — one UserQuery record per line.
+All dataset generation logic lives in data/generate.<ext>. All prompt templates referenced in the schema below are stored as versioned constants inside this script. Every LLM call records its model, prompt template name, and seed. The final output is a single data/queries.jsonl — one UserQuery record per line.
 
 `UserQuery` schema:
 {
-  id:               string,
+  id:               string,                     # stable unique ID (e.g. uuid or hash); used to link result.json back to source
   query:            string,
   is_real:          bool,                       # true = production, false = synthetic
   categories:       List[string],               # multi-label, e.g. ["factual", "multi-hop"]
@@ -90,14 +91,14 @@ All dataset generation logic lives in data/generate.<ext>. Every LLM call record
     },
     rationale:          string,
     model:              string,
-    prompt_template:    string                  # versioned template name
+    prompt_template:    string                  # versioned template name (defined in generate.<ext>)
   },
   augmented_queries: [{
     query:                         string,
     technique:                     string,
     technique_selection_rationale: string,
     model:                         string,
-    prompt_template:               string,      # versioned template name
+    prompt_template:               string,      # versioned template name (defined in generate.<ext>)
     generation_seed:               int
   }],
   metadata: Any                                 # opaque field for any additional info (e.g. production query ID, augmentation lineage, etc.)
@@ -105,11 +106,11 @@ All dataset generation logic lives in data/generate.<ext>. Every LLM call record
 
 Pipeline — run sequentially inside data/generate.<ext>:
 
-5. Ask the user: _"Do you have real production queries I can use as a seed set?"_
+5. Ask the user: _"Do you have production query data I can pull from? If so, where does it live — e.g. a database, an API, log files, an analytics platform?"_
 
 **If YES — sample from production:**
 
-  a. Pull and randomly sample using a fixed seed (versioned constant in code) to ensure reproducibility. Sample at least 100 queries if possible. The pull and sampling logic lives entirely in generate.<ext>.
+  a. Pull and randomly sample using a fixed seed (versioned constant in code) to ensure reproducibility. Aim for at least 100 sampled queries if available, so each category has enough representation for downstream statistical tests. The pull and sampling logic lives entirely in generate.<ext>.
 
   b. Study all the sampled queries and come up with categorisation given the system intent. Classify each query into one or more categories (e.g. "factual", "multi-hop", "ambiguous", "domain-specific"), and difficulty level (easy, medium, hard) based on the axes defined in the   `UserQuery`schema. Document category definitions and difficulty label rationale in `agent-eval/doc.md` section 4.
 
@@ -133,7 +134,9 @@ Pipeline — run sequentially inside data/generate.<ext>:
 
    Maintain balanced difficulty distribution across the augmented set. Save end-to-end queries to `data/end-to-end/`.
 
-   **Component-level test data**: do not construct these from scratch. After the first end-to-end run (Phase 5, step 8), the intermediate output of each component is cached to disk. Use those cached outputs as the input test cases for each component's isolated eval — this reflects the real upstream distribution each component sees in production. Save to `data/component-level/<component>/`.
+   **Dataset support table**: after `queries.jsonl` is finalised, compute per-category × difficulty counts (seeds + augmentations combined) and surface them in `agent-eval/doc.md` section 4 as the "Dataset Support" table. Use this to confirm each cell has enough representation for downstream statistical tests.
+
+   **Component-level test data**: do not construct these from scratch. After the first end-to-end run (Phase 5, step 8), the intermediate output of each component is cached to disk. Use those cached outputs as the input test cases for each component's isolated eval — this reflects the real upstream distribution each component sees in production. Save to `data/component-level/<component>/` with a `manifest.json` recording the source end-to-end run date and `result.json` path. If the end-to-end dataset is later regenerated, the manifest is stale — regenerate component-level data.
 
    Document dataset structure, generation methodology, and difficulty label rationale in `agent-eval/doc.md` section 4.
 
@@ -165,16 +168,16 @@ Pipeline — run sequentially inside data/generate.<ext>:
      - Difficulty vs. score heatmap (easy / medium / hard × categories)
      - Trial variance plot for end-to-end (mean ± CI per category)
    - Update `agent-eval/doc.md` as follows:
-     - **Section 5**: fill in component and end-to-end results tables with scores, CIs, and run reference
+     - **Section 5**: fill in component-level results (with CIs) and end-to-end results in two views — (a) overall: single mean ± CI across the whole dataset, (b) by category × difficulty: per-cell mean ± CI plus row/column overalls. Cite the run file for every cell.
      - **Section 6a**: fill in the initial trigger rules, scope, and flag any categories that are already near-saturated or showing high trial variance
-     - **Section 6b**: append the first row to the run history table (date, git hash, run file, "Initial cold start", score ± CI, p-value = —, strategy updates = None)
-   - Output a summary table in chat showing component scores, end-to-end scores (mean ± 95% CI), and per-category breakdown
+     - **Section 6b**: append the first row to the run history table (date, git hash, run file, "Initial cold start", overall E2E score ± CI, p-value = —, strategy updates = None)
+   - Output a summary table in chat showing component scores, end-to-end overall (mean ± 95% CI), and the by-category × difficulty breakdown
 
 ---
 
 ## NEXT RUN
 
-1. **Diff check** — use `git diff` against the git hash stored in the last `result.json`. If git is unavailable, fall back to file modification timestamps on component source files. Changes that **trigger re-evaluation**: prompt text, model name/version, component logic (source files in the component's module), tool definitions. Changes that **do not trigger re-evaluation**: logging, comments, UI, infrastructure. List the affected components explicitly and confirm with the user before proceeding.
+1. **Diff check** — use `git diff` against the git hash stored in the last `result.json`. If git is unavailable, fall back to file modification timestamps on component source files. Changes that **trigger re-evaluation**: prompt text, model name/version, component logic (source files in the component's module), tool definitions. Changes that **trigger dataset regeneration**: any prompt template referenced in the `UserQuery` schema (categorisation, difficulty scoring, augmentation technique selection, augmentation generation), the sampling seed, or category definitions. If the end-to-end dataset is regenerated, check `data/component-level/<component>/manifest.json` — if the referenced run no longer matches the latest end-to-end dataset, regenerate component-level data too. Changes that **do not trigger re-evaluation**: logging, comments, UI, infrastructure. List the affected artefacts explicitly and confirm with the user before proceeding.
 
 2. **Dataset review** — check whether the existing dataset still covers the changed components adequately. If new categories or augmentation are needed, follow COLD-START Phase 3 for only the affected scope.
 
@@ -183,7 +186,7 @@ Pipeline — run sequentially inside data/generate.<ext>:
 4. **Run** — execute `run.<ext>` (3 trials per end-to-end query, single run for components). Pull per-query scores from `runs/<last-date>/result.json` and run a paired t-test (or bootstrap if n < 30) against the new scores. Then update `doc.md`:
    - **Section 6a**: review every bullet — revise trigger rules if new components were added, update scope if new failure modes emerged, flag any category that newly saturated (>95%) or showed high variance. Record a one-line summary of what changed and why.
    - **Section 6b**: append one row with date, git hash, run file, description of what changed, score ± CI, p-value vs. previous run, and a brief note on any strategy updates made to 6a.
-   - Output a before/after comparison table in chat with mean ± CI per component and category, p-value, and effect size. Generate a before/after delta chart saved to `runs/<YYYY-MM-DD>/images/`. Flag a regression only if the drop is statistically significant at p < 0.05 — report effect size alongside so small-but-significant drops can be weighed in context.
+   - Output a before/after comparison table in chat with overall mean ± CI and per category × difficulty mean ± CI, p-value, and effect size. Generate a before/after delta chart saved to `runs/<YYYY-MM-DD>/images/`. Flag a regression only if the drop is statistically significant at p < 0.05 — report effect size alongside so small-but-significant drops can be weighed in context.
 
 ---
 

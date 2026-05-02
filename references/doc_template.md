@@ -1,7 +1,7 @@
 # [System Name] — Evaluation Report
 
 > **Run reference**: `runs/YYYY-MM-DD/result.json`  
-> **Dataset**: `data/end-to-end/` · `data/component-level/`  
+> **Dataset**: `data/queries.jsonl`  
 > **Last updated**: YYYY-MM-DD
 
 ---
@@ -43,27 +43,43 @@ User Query → [Component A] → [Component B] → ... → Final Output
 
 ### Query Categories
 
-_Each category should be meaningfully distinct from the others._
+_Multi-label — a query can belong to multiple categories, so totals may exceed unique query count._
 
-| Category | Description | # Queries |
-|----------|-------------|-----------|
-| `category-a` | ... | 10 |
-| `category-b` | ... | 10 |
+| Category | Description |
+|----------|-------------|
+| `category-a` | ... |
+| `category-b` | ... |
 
-### Generation Methodology
+### Dataset Support (category × difficulty)
 
-- **Source**: _(Synthetic / sampled from production / mixed)_
-- **Seed set**: 10 queries per category, balanced across easy / medium / hard (min 1–2 per level)
-- **Difficulty rating**: each query scored across three axes — query clarity (explicit → ambiguous), reasoning depth (single-step → multi-hop), domain specificity (common knowledge → expert). Easy = low on all three; hard = high on two or more; medium = otherwise.
-- **Augmentation**: 3–4 techniques applied per seed (obscuration, entity swapping, format/style variation, negation injection, compositional queries, noise injection, specificity variation), targeting ~50 queries per category. Technique selection guided by query type.
-- **Component-level data**: derived from cached intermediate outputs of the first end-to-end run, not constructed independently.
+_Number of queries per category × difficulty level (seeds + augmentations combined). Use to confirm sufficient representation for statistical tests._
 
-### Dataset Files
+| Category | Easy | Medium | Hard | Total |
+|----------|------|--------|------|-------|
+| `category-a` | ... | ... | ... | ... |
+| `category-b` | ... | ... | ... | ... |
+| **Total**    | ... | ... | ... | ... |
 
-| File | Description |
-|------|-------------|
-| `data/end-to-end/` | Full pipeline test queries |
-| `data/component-level/<component>/` | Isolated component test cases |
+**Source split**: X production / Y synthetic (Z% / W%)
+
+### Generation Configuration
+
+_Versioned record of every input that could change between runs. Diff this section across runs to see what changed._
+
+- **Source**: production (<where>) + synthetic supplementation
+- **Sampling seed**: ...
+- **Categorisation**: prompt=`<template_name>`, model=`<model>`
+- **Difficulty scoring**: prompt=`<template_name>`, model=`<model>`
+- **Augmentation — technique selection**: prompt=`<template_name>`, model=`<model>`
+- **Augmentation — generation**: per-technique prompts (`<obscuration_v1>`, `<entity_swap_v1>`, ...)
+- **Generated**: YYYY-MM-DD via `data/generate.<ext>`
+- **Component-level data source**: `runs/YYYY-MM-DD/result.json` (per `data/component-level/<component>/manifest.json`)
+
+### Pipeline Overview
+
+_Brief context for readers; full behaviour is defined in the skill, not here._
+
+Dataset built by pulling production queries, randomly sampling at a fixed seed, applying LLM categorisation and difficulty scoring, identifying gaps via category × difficulty distribution, supplementing with synthetic generation, then augmenting each seed via 3–4 LLM-selected techniques. Difficulty re-scored on augmented queries. Full per-record lineage in `data/queries.jsonl`.
 
 ---
 
@@ -73,19 +89,28 @@ _Cite the exact run file and dataset used for every result reported._
 
 ### Component-Level
 
-| Component | Metric | Score | Run |
-|-----------|--------|-------|-----|
-| `component-a` | ... | ... | `runs/YYYY-MM-DD/result.json` |
-| `component-b` | ... | ... | `runs/YYYY-MM-DD/result.json` |
+| Component | Metric | Score | 95% CI | Run |
+|-----------|--------|-------|--------|-----|
+| `component-a` | ... | ... | ... | `runs/YYYY-MM-DD/result.json` |
+| `component-b` | ... | ... | ... | `runs/YYYY-MM-DD/result.json` |
 
 ### End-to-End
 
 _3 trials per query. Score = mean across trials. All scores reported with 95% CI._
 
-| Category | Metric | Mean Score | 95% CI | Trials | Run |
-|----------|--------|------------|--------|--------|-----|
-| `category-a` | ... | ... | ... | 3 | `runs/YYYY-MM-DD/result.json` |
-| `category-b` | ... | ... | ... | 3 | `runs/YYYY-MM-DD/result.json` |
+**Overall**
+
+| Metric | Mean Score | 95% CI | n queries | Run |
+|--------|------------|--------|-----------|-----|
+| ... | ... | ... | ... | `runs/YYYY-MM-DD/result.json` |
+
+**By category × difficulty**
+
+| Category | Easy (mean ± CI) | Medium (mean ± CI) | Hard (mean ± CI) | Overall |
+|----------|------------------|--------------------|--------------------|---------|
+| `category-a` | ... | ... | ... | ... |
+| `category-b` | ... | ... | ... | ... |
+| **Overall**  | ... | ... | ... | ... |
 
 _Charts: see `runs/YYYY-MM-DD/images/` — score distribution, per-category breakdown, difficulty heatmap, trial variance._
 
@@ -99,7 +124,8 @@ _Key findings, failure modes, surprising results. Be specific._
 
 _The living rules for how future runs should be conducted. Review and update this section after every run — revise rules when the system changes, categories saturate, or variance patterns shift._
 
-- **Trigger**: What changes warrant a re-run. Default: prompt text, model name/version, component logic, tool definitions. Update this list if new components are added or scope changes.
+- **Re-evaluation triggers**: prompt text, model name/version, component logic, tool definitions. Update this list if new components are added or scope changes.
+- **Dataset regeneration triggers**: any prompt template referenced in the `UserQuery` schema (categorisation, difficulty scoring, augmentation technique selection, augmentation generation), the sampling seed, or category definitions. A regenerated dataset invalidates component-level data — check manifests.
 - **Scope**: Which components and categories to re-evaluate for each type of change. Refine after each run based on what proved sensitive vs. stable.
 - **Pass criteria**: A drop is a regression if statistically significant at p < 0.05 (paired t-test if n ≥ 30, bootstrap with 1,000 resamples if n < 30). Always report effect size — a significant but tiny drop may not warrant action.
 - **Saturation watch**: If any category reaches a near-perfect score (>95%), flag it to graduate from capability eval to regression suite — it no longer measures headroom, only backsliding.
