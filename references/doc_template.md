@@ -12,7 +12,8 @@ _A concise description of what this agentic system does, its intended users, and
 
 **System goal**: ...  
 **Input**: ...  
-**Output**: ...
+**Output**: ...  
+**Eval type**: Decomposable / Black-box
 
 ---
 
@@ -41,9 +42,9 @@ User Query → [Component A] → [Component B] → ... → Final Output
 
 ## 4. Dataset
 
-### Query Categories
+### Input Categories
 
-_Multi-label — a query can belong to multiple categories, so totals may exceed unique query count._
+_Categories describe input characteristics (reasoning complexity, intent clarity, scope, domain) — not pipeline stage names. Multi-label: a case can belong to multiple categories._
 
 | Category | Description |
 |----------|-------------|
@@ -87,7 +88,7 @@ Dataset built by pulling production queries, randomly sampling at a fixed seed, 
 
 _Cite the exact run file and dataset used for every result reported._
 
-### Component-Level
+### Component-Level _(decomposable systems only)_
 
 | Component | Metric | Score | 95% CI | Run |
 |-----------|--------|-------|--------|-----|
@@ -125,7 +126,7 @@ _Key findings, failure modes, surprising results. Be specific._
 _The living rules for how future runs should be conducted. Review and update this section after every run — revise rules when the system changes, categories saturate, or variance patterns shift._
 
 - **Re-evaluation triggers**: prompt text, model name/version, component logic, tool definitions. Update this list if new components are added or scope changes.
-- **Dataset regeneration triggers**: any prompt template referenced in the `UserQuery` schema (categorisation, difficulty scoring, augmentation technique selection, augmentation generation), the sampling seed, or category definitions. A regenerated dataset invalidates component-level data — check manifests.
+- **Dataset regeneration triggers**: any prompt template referenced in the `EvalCase` schema (categorisation, difficulty scoring, augmentation technique selection, augmentation generation), the sampling seed, or category definitions. A regenerated dataset invalidates component-level data — check manifests.
 - **Scope**: Which components and categories to re-evaluate for each type of change. Refine after each run based on what proved sensitive vs. stable.
 - **Pass criteria**: A drop is a regression if statistically significant at p < 0.05 (paired t-test if n ≥ 30, bootstrap with 1,000 resamples if n < 30). Always report effect size — a significant but tiny drop may not warrant action.
 - **Saturation watch**: If any category reaches a near-perfect score (>95%), flag it to graduate from capability eval to regression suite — it no longer measures headroom, only backsliding.

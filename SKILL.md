@@ -55,6 +55,7 @@ agent-eval/
    - Every key modelling component (e.g. retriever, reranker, generator, classifier)
    - The input and output of each component
    - The primary language of the codebase — all evaluation code must be written in this language
+   - Whether each component can be invoked independently with controlled inputs (**decomposable**) or only as part of the full agent loop (**black-box**). Document this in doc.md Section 1.
 
 2. If the system intent is ambiguous, confirm with the user before proceeding.
 
@@ -74,12 +75,12 @@ agent-eval/
 
 ### Phase 3 — Build the Dataset
 
-All dataset generation logic lives in data/generate.<ext>. All prompt templates referenced in the schema below are stored as versioned constants inside this script. Every LLM call records its model, prompt template name, and seed. The final output is a single data/queries.jsonl — one UserQuery record per line.
+All dataset generation logic lives in data/generate.<ext>. All prompt templates referenced in the schema below are stored as versioned constants inside this script. Every LLM call records its model, prompt template name, and seed. The final output is a single data/queries.jsonl — one EvalCase record per line. Every `model` field in the EvalCase schema must reference a real model — static hard-coded cases with no LLM-scored difficulty or augmentation are not valid.
 
-`UserQuery` schema:
+`EvalCase` schema:
 {
   id:               string,                     # stable unique ID (e.g. uuid or hash); used to link result.json back to source
-  query:            string,
+  input:            string,
   is_real:          bool,                       # true = production, false = synthetic
   categories:       List[string],               # multi-label, e.g. ["factual", "multi-hop"]
   difficulty: {
@@ -112,14 +113,14 @@ Pipeline — run sequentially inside data/generate.<ext>:
 
   a. Pull and randomly sample using a fixed seed (versioned constant in code) to ensure reproducibility. Aim for at least 100 sampled queries if available, so each category has enough representation for downstream statistical tests. The pull and sampling logic lives entirely in generate.<ext>.
 
-  b. Study all the sampled queries and come up with categorisation given the system intent. Classify each query into one or more categories (e.g. "factual", "multi-hop", "ambiguous", "domain-specific"), and difficulty level (easy, medium, hard) based on the axes defined in the   `UserQuery`schema. Document category definitions and difficulty label rationale in `agent-eval/doc.md` section 4.
+  b. Study all the sampled queries and come up with categorisation given the system intent. Classify each query into one or more categories based on **input characteristics** — e.g. reasoning complexity (single-step vs multi-hop), intent clarity (explicit vs ambiguous), scope, domain — not pipeline stage names. Assign difficulty (easy, medium, hard) based on the axes in the `EvalCase` schema. Document category definitions and difficulty label rationale in `agent-eval/doc.md` section 4.
 
   c. From each category, select **an appropriate number of representative seed queries**, balanced across easy / medium / hard, to use as the basis for augmentation. 
 
 **Synthetic Generation:**
 
 
-  a. Based on the system intent, define a set of **distinct query categories** that users might ask via LLM. If production queries are available, conduct a gap analysis to identify missing categories and underrepresented categories. Document category definitions in `agent-eval/doc.md` section 4.
+  a. Based on the system intent, define a set of **distinct query categories** grounded in **input characteristics** (reasoning complexity, intent clarity, scope, domain) — not pipeline stage names. If production queries are available, conduct a gap analysis to identify missing or underrepresented categories. Document category definitions in `agent-eval/doc.md` section 4.
 
   b. For each new / underrepresented category, generate **an appropriate number of representative seed queries** with production queries as style transfer if available, balanced across easy / medium / hard, to use as the basis for augmentation. 
 
@@ -147,10 +148,10 @@ Pipeline — run sequentially inside data/generate.<ext>:
 7. Write the following in the codebase's language, keeping code **concise and readable** — do not over-engineer:
 
    - **Dataset loader** — reads from `data/` directories
-   - **Component-level eval** — evaluates each component in sequence, passing the output of stage N as input to stage N+1 (to reflect realistic pipeline behaviour). Single run per query.
+   - **Component-level eval** _(decomposable systems only)_ — evaluates each component in sequence, passing the output of stage N as input to stage N+1 (to reflect realistic pipeline behaviour). Single run per query. Skip entirely for black-box systems.
    - **End-to-end eval** — runs the full pipeline on `data/end-to-end/` with **3 trials per query**. Report the mean score across trials as the final score for each query. This accounts for LLM non-determinism. Store all 3 trial outputs per query in `result.json`.
    - **Statistical testing** — after aggregating trial means, run a paired t-test (or bootstrap with 1,000 resamples if n < 30) against the previous run's per-query scores. Report p-value and effect size. Never report a score without a 95% confidence interval.
-   - **`run.<ext>`** — single entry point that runs component eval, end-to-end eval (3 trials), stat testing, and chart generation sequentially, writing all results to `runs/<YYYY-MM-DD>/result.json`. Store the git hash (if available) in the result file.
+   - **`run.<ext>`** — single entry point that runs component eval (if applicable), end-to-end eval (3 trials), stat testing, and chart generation sequentially, writing all results to `runs/<YYYY-MM-DD>/result.json`. Store the git hash (if available) in the result file.
 
    All metrics go into `metrics/` as simple, importable modules in the codebase's language.
 
@@ -177,7 +178,7 @@ Pipeline — run sequentially inside data/generate.<ext>:
 
 ## NEXT RUN
 
-1. **Diff check** — use `git diff` against the git hash stored in the last `result.json`. If git is unavailable, fall back to file modification timestamps on component source files. Changes that **trigger re-evaluation**: prompt text, model name/version, component logic (source files in the component's module), tool definitions. Changes that **trigger dataset regeneration**: any prompt template referenced in the `UserQuery` schema (categorisation, difficulty scoring, augmentation technique selection, augmentation generation), the sampling seed, or category definitions. If the end-to-end dataset is regenerated, check `data/component-level/<component>/manifest.json` — if the referenced run no longer matches the latest end-to-end dataset, regenerate component-level data too. Changes that **do not trigger re-evaluation**: logging, comments, UI, infrastructure. List the affected artefacts explicitly and confirm with the user before proceeding.
+1. **Diff check** — use `git diff` against the git hash stored in the last `result.json`. If git is unavailable, fall back to file modification timestamps on component source files. Changes that **trigger re-evaluation**: prompt text, model name/version, component logic (source files in the component's module), tool definitions. Changes that **trigger dataset regeneration**: any prompt template referenced in the `EvalCase` schema (categorisation, difficulty scoring, augmentation technique selection, augmentation generation), the sampling seed, or category definitions. If the end-to-end dataset is regenerated, check `data/component-level/<component>/manifest.json` — if the referenced run no longer matches the latest end-to-end dataset, regenerate component-level data too. Changes that **do not trigger re-evaluation**: logging, comments, UI, infrastructure. List the affected artefacts explicitly and confirm with the user before proceeding.
 
 2. **Dataset review** — check whether the existing dataset still covers the changed components adequately. If new categories or augmentation are needed, follow COLD-START Phase 3 for only the affected scope.
 
