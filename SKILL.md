@@ -1,6 +1,15 @@
 ---
 name: agent-eval
-description: Evaluate agentic systems at component and end-to-end level, producing a structured report with metrics, datasets, and regression strategy. Use this skill whenever the user wants to evaluate, benchmark, or test any agentic or AI pipeline system — including RAG pipelines, multi-agent systems, LLM chains, retrieval systems, or any system with modelling components. Triggers include: "evaluate my agent", "benchmark my pipeline", "write evals for", "test my RAG", "how is my system performing", "set up evals", or any request to measure or compare AI system performance. Always use this skill when the user shares a codebase and asks how well it works.
+description: >
+  Evaluate agentic systems at component and end-to-end level, producing a
+  structured report with metrics, datasets, and regression strategy. Use this
+  skill whenever the user wants to evaluate, benchmark, or test any agentic or
+  AI pipeline system, including RAG pipelines, multi-agent systems, LLM
+  chains, retrieval systems, or any system with modelling components.
+  Triggers include: "evaluate my agent", "benchmark my pipeline", "write evals
+  for", "test my RAG", "how is my system performing", and "set up evals".
+  Always use this skill when the user shares a codebase and asks how well it
+  works.
 ---
 
 # Agent Evaluation Skill

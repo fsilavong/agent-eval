@@ -8,10 +8,15 @@ Agent Eval is a skill for evaluating agentic AI pipeline systems at both the com
 
 ## Install
 
-Copy or clone this folder into your Claude skills directory:
+**Manual**
 
 ```bash
 git clone https://github.com/fsilavong/agent-eval.git ~/.claude/skills/agent-eval
 ```
 
-Restart Claude so the new skill is loaded.
+Install with the **Vercel Skills CLI**:
+
+```bash
+npx skills add fsilavong/agent-eval
+```
+
