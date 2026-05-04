@@ -1,7 +1,7 @@
 # [System Name] — Evaluation Report
 
 > **Run reference**: `runs/YYYY-MM-DD/result.json`  
-> **Dataset**: `data/queries.jsonl`  
+> **Dataset**: `data/cases.jsonl`  
 > **Last updated**: YYYY-MM-DD
 
 ---
@@ -80,7 +80,7 @@ _Versioned record of every input that could change between runs. Diff this secti
 
 _Brief context for readers; full behaviour is defined in the skill, not here._
 
-Dataset built by pulling production queries, randomly sampling at a fixed seed, applying LLM categorisation and difficulty scoring, identifying gaps via category × difficulty distribution, supplementing with synthetic generation, then augmenting each seed via 3–4 LLM-selected techniques. Difficulty re-scored on augmented queries. Full per-record lineage in `data/queries.jsonl`.
+Dataset built by pulling production queries, randomly sampling at a fixed seed, applying LLM categorisation and difficulty scoring, identifying gaps via category × difficulty distribution, supplementing with synthetic generation, then augmenting each seed via 3–4 LLM-selected techniques. Difficulty re-scored on augmented queries. Full per-record lineage in `data/cases.jsonl`.
 
 ---
 
@@ -118,6 +118,32 @@ _Charts: see `runs/YYYY-MM-DD/images/` — score distribution, per-category brea
 ### Observations
 
 _Key findings, failure modes, surprising results. Be specific._
+
+---
+
+## 5b. Notable Examples
+
+_2–3 cases selected to make the score distribution concrete: highest-scoring, lowest-scoring, and optionally one surprising case. For each: show abbreviated source input and system output (≤300 words each), the per-dimension judge scores for whatever dimensions this eval uses, the judge's rationale, and a 2–3 sentence analysis of why it scored that way. Analysis must go beyond restating the score — explain what the system did or failed to do and what this implies about the failure mode._
+
+### [Case ID] — [category] — composite: X.XX
+
+**Source input (abbreviated)**
+> _key content from the input(s) this case was built on_
+
+**System output (abbreviated)**
+> _key content from what the system produced_
+
+**Judge scores**: _list each dimension and its normalised score (0–1); composite = mean_
+
+**Judge rationale**: _quoted or paraphrased_
+
+**Analysis**: _2–3 sentences on why it scored this way and what it reveals about the system's behaviour_
+
+---
+
+## 7. Takeaways
+
+_Include only if findings point to a change that would make a significant difference. Maximum 3. Each must cite the specific score or pattern from this run AND ground the recommendation in established knowledge — published research, known failure modes in the LLM evaluation literature, or reproducible findings from credible sources. Write as a domain expert: say why this is a known class of problem, not just what you observed. Skip anything obvious, generic, or supported only by two data points. Omit this section entirely if no takeaway clears this bar._
 
 ---
 
