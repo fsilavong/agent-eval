@@ -30,10 +30,13 @@ _List each modelling component identified during codebase study. For each, docum
 
 ## 3. End-to-End Pipeline
 
-_Describe the full pipeline from raw user query to final output. Include a brief flow diagram in text or Mermaid if helpful._
+_Describe the full pipeline from raw user query to final output. Use a Mermaid flowchart._
 
-```
-User Query → [Component A] → [Component B] → ... → Final Output
+```mermaid
+flowchart LR
+  A[User Query] --> B[Component A]
+  B --> C[Component B]
+  C --> D[Final Output]
 ```
 
 **End-to-end metric**: _Name and justification. Reference industry standard where applicable._
