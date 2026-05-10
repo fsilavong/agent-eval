@@ -21,10 +21,10 @@ _A concise description of what this agentic system does, its intended users, and
 
 _List each modelling component identified during codebase study. For each, document its role, input, output, and chosen evaluation metric._
 
-| Component | Role | Input | Output | Metric |
-|-----------|------|-------|--------|--------|
-| `component-a` | ... | ... | ... | ... |
-| `component-b` | ... | ... | ... | ... |
+| Component | Role | Input | Output | Primary Metric | Diagnostics |
+|-----------|------|-------|--------|----------------|-------------|
+| `component-a` | ... | ... | ... | ... | ... |
+| `component-b` | ... | ... | ... | ... | ... |
 
 ---
 
@@ -39,7 +39,8 @@ flowchart LR
   C --> D[Final Output]
 ```
 
-**End-to-end metric**: _Name and justification. Reference industry standard where applicable._
+**Primary metric**: _Name and justification. Reference industry standard where applicable._
+**Diagnostic metrics**: _Any additional dimensions tracked (optional). These explain why the primary metric moved but don't gate regression decisions._
 
 ---
 
