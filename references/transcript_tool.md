@@ -45,4 +45,4 @@ The tool must confirm to the user after each save: _"Saved."_ Annotations persis
 
 - **Freeform over forms** — one text field, not a rubric to click through. Structure is extracted after, not imposed before.
 - **Skip everything** — annotations are optional. Viewing alone is valuable.
-- **Lightweight** — generated as a local HTML file or started with one command as a local server.
+- **Lightweight** — started with one command. On submit, the UI must persist annotations directly to `annotations.jsonl` (e.g. via a small local HTTP endpoint the page POSTs to). Do **not** fall back to a file download — annotations must save in place without user action beyond clicking submit.
